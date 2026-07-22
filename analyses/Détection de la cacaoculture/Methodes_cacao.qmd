@@ -1,6 +1,7 @@
 ---
 title: "Méthodes pour la détéction des agroforesteries cacaoyères sans échantillons terrain ni machine learning"
 format: html
+author: Rodrigue da Silva
 ---
 # Mes analyses
 ## Méthode 1: Mosaïque et K-means sur GEE
