@@ -511,7 +511,7 @@ writeRaster(r_med,
 
 
 
-# Méthode 1: Méthode SBR SWIR1/NIR
+# Méthode 3: Méthode SBR SWIR1/NIR
 
 ## Raisonnement
 
@@ -775,6 +775,8 @@ Export.image.toDrive({
 
 });
 </script>
+
+
 
 
 
