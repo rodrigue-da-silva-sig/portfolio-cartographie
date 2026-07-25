@@ -270,6 +270,9 @@ Une fois le périmètre d'agroforêts suspectées cerné, il est nécessaire de 
 
 
 
+
+
+
 # Méthode 2: Comparaison NIR saisonnière
 
 ## Mosaïque et calcul K-means sur GEE
