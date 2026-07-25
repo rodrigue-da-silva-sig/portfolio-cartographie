@@ -570,23 +570,23 @@ function maskLandsat(image){
 
 // =====================
 // AJOUT DU SBR
-// SBR = SWIR1 / NIR
+// SBR = RED EDGE2 / RED EDGE1
 // =====================
 
 function addSBR(image){
 
-  var nir = image
+  var rededge1 = image
     .select('B5')
     .multiply(0.0000275)
     .add(-0.2);
 
-  var rededge = image
+  var rededge2 = image
     .select('B6')
     .multiply(0.0000275)
     .add(-0.2);
 
-  var sbr = rededge
-    .divide(nir)
+  var sbr = rededge2
+    .divide(rededge1)
     .rename('SBR');
 
   return image.addBands(sbr);
@@ -648,7 +648,7 @@ Map.addLayer(
 // COMPOSITE MEDIAN
 // =====================
 
-var nirMedian = imagesSBR
+var rededge1Median = imagesSBR
   .select('B5')
   .median()
   .multiply(0.0000275)
@@ -656,12 +656,12 @@ var nirMedian = imagesSBR
   .clip(roi);
 
 Map.addLayer(
-  nirMedian,
+  rededge1Median,
   {
     min:0,
     max:0.5
   },
-  'NIR médian'
+  'RED_EDGE1 médian'
 );
 
 var sbrMedian = imagesSBR
@@ -729,9 +729,9 @@ Map.addLayer(
 
 Export.image.toDrive({
 
-  image: nirMedian,
+  image: rededge1Median,
 
-  description: 'NIR_Median_2021_2026',
+  description: 'RED_EDGE1_Median_2021_2026',
 
   folder: 'QGIS_EXPORT',
 
