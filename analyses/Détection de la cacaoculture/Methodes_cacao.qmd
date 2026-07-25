@@ -288,13 +288,13 @@ var roi = ee.Geometry.Rectangle([
 Map.centerObject(roi, 8);
 Map.addLayer(roi, {}, 'ROI');
 
-// == COLLECTION LANDSAT ==
+// == Collaction Landsat ==
 
 var Landsat = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
   .merge(ee.ImageCollection("LANDSAT/LC09/C02/T1_L2"));
 
 
-// == FONCTION CREATION SAISON ==
+// == Fonction création des saisons ==
 
 function buildSeason(years, startMonth, startDay, endMonth, endDay){
 
@@ -378,7 +378,7 @@ var Wet = buildSeason(
 );
 
 
-// == EXTRACTION DES IMAGES ==
+// == Extraction des images ==
 
 var Dry_RED = Dry.select('RED');
 var Dry_NIR = Dry.select('NIR');
@@ -389,7 +389,7 @@ var Wet_NIR = Wet.select('NIR');
 var Wet_NDVI = Wet.select('NDVI');
 
 
-// == VISUALISATION ==
+// == Visualisation ==
 
 Map.addLayer(Dry_RED,{min:0,max:0.3},'Dry RED');
 
@@ -420,7 +420,7 @@ Map.addLayer(
 );
 
 
-// == EXPORTS ==
+// == Exports vers QGIS_Export ==
 
 Export.image.toDrive({
   image: Dry_RED,
@@ -484,3 +484,29 @@ En période de pluies fortes et de maximum végétatif (début mars- fin novembr
 En choisissant un seuil NIR_humide > 0.35, on obtient les zones avec un NIR très élevé (cultures à ciel ouvert et agroforesteries sous canopée). Pour n'obtenir que les agroforesteries sous canopée, on peut discrimier les champs ouverts en choisissant un seuil RED_humide >  (les images en saison humide étant plus propres).
 Aussi, en appliquant un seuil NIR_sec > , on peut obtenir directement les agroforesteries sous canopée bien que moins visibles (d'où l'utilité du NIR_humide). 
 Ce test reste toutefois assez sommaire et bien moins précis que la cartographie du cacao de la FAO, produite par machine-learning. Pour effacer les potentiels faux-positifs, on peut lisser les résultats avec un filtre médian sur R:
+
+```{r}
+library(terra)
+
+# Charger le raster
+r <- rast("./AGROFOREST.tif")
+
+# Filtre médian 3x3
+r_med <- focal(r,
+               w = matrix(1, 3, 3),
+               fun = median,
+               na.rm = TRUE)
+
+# Export correct
+writeRaster(r_med,
+            filename = "./AGROFOREST_lissee.tif",
+            format = "GTiff",
+            overwrite = TRUE)
+```
+
+
+
+
+
+
+
