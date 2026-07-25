@@ -230,7 +230,7 @@ for (var i = 0; i < nb; i++) {
 
 
 
-  // == Export Google Drive ==
+  // == Export Google Drive dans le fichier GEE_Exports ==
 
 
   Export.image.toDrive({
@@ -263,8 +263,224 @@ for (var i = 0; i < nb; i++) {
 
 ## Comparaison NIR-classification
 
-Les 48 images sont ensuite extraites de Google Drive pour être traitées dans QGIS: c'est là que l'utilisateur va rassembler les 20 classes.
-En période de pluies fortes et de maximum végétatif (fin novembre- fin mars) les agroforêts sous ombrage, plus jeunes émettent fortement dans le proche infrarouge, plus que les forêts mais moins que les cultures à ciel ouvert. En période de déclin végétatif ou de moindres pluies (fin novembre- fin mars) leur réflectance moyenne dans le proche infrarouge les distingue du reste de la végétation et particulièrement des cultures à ciel ouvert qui n'émettent plus dans ces longueurs d'onde. En augmentant les contrastes des images, les agroforêts sous ombrages deviennent évidentes. Le NDVI des agroforêts est aussi plus fort que celui des forêts primaires aux alentours. 
-En se servant des images NIR (proche-infrarouge) qui distinguent bien l'agroforesterie (ou se trouve le cacao) et du NDVI, l'utilisateur pourra trier la ou les classes qui sont le plus susceptibles d'en faire partie.
-Une fois le périmètre d'agroforêts suspectées cerné, il est nécessaire de croiser ces données avec les quelques données de terrain disponibles quelque soit
+Les 48 images sont ensuite extraites de Google Drive pour être traitées dans QGIS: c'est là que l'utilisateur va rassembler manuellement les 20 classes en 6 classes parmi lesquelles l'agroforesterie sous ombrage.
+En se servant exclusivement des images NIR (proche-infrarouge) qui distinguent bien les agroforesteries sous ombrage et du NDVI, l'utilisateur pourra trier la ou les classes qui sont le plus susceptibles d'en faire partie.
+Une fois le périmètre d'agroforêts suspectées cerné, il est nécessaire de croiser ces données avec les connaissances du terrain, les cartographies participatives et d'autres jeux de données tel le Global Canopy Height.
 
+
+
+
+# Méthode 2: Comparaison NIR saisonnière
+
+## Mosaïque et calcul K-means sur GEE
+
+
+<script>
+// == ROI ==
+
+var roi = ee.Geometry.Rectangle([
+  14.9,
+  0.6,
+  17.7,
+  3.6
+]);
+
+Map.centerObject(roi, 8);
+Map.addLayer(roi, {}, 'ROI');
+
+// == COLLECTION LANDSAT ==
+
+var Landsat = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
+  .merge(ee.ImageCollection("LANDSAT/LC09/C02/T1_L2"));
+
+
+// == FONCTION CREATION SAISON ==
+
+function buildSeason(years, startMonth, startDay, endMonth, endDay){
+
+  var collection = ee.ImageCollection([]);
+
+  years.forEach(function(year){
+
+    var start = ee.Date.fromYMD(year, startMonth, startDay);
+
+    var end;
+
+    if(startMonth > endMonth){
+      end = ee.Date.fromYMD(year + 1, endMonth, endDay);
+    } else {
+      end = ee.Date.fromYMD(year, endMonth, endDay);
+    }
+
+    var img = Landsat
+      .filterBounds(roi)
+      .filterDate(start, end)
+      .filter(ee.Filter.lt('CLOUD_COVER',30))
+      .median()
+      .clip(roi);
+
+    // Réflectance Landsat L2
+
+    var red = img
+      .select('SR_B4')
+      .multiply(0.0000275)
+      .add(-0.2)
+      .rename('RED');
+
+    var nir = img
+      .select('SR_B5')
+      .multiply(0.0000275)
+      .add(-0.2)
+      .rename('NIR');
+
+    var ndvi = nir
+      .subtract(red)
+      .divide(nir.add(red))
+      .rename('NDVI');
+
+    var result = ee.Image.cat([
+      red,
+      nir,
+      ndvi
+    ]);
+
+    collection = collection.merge(
+      ee.ImageCollection([result])
+    );
+
+  });
+
+  return collection.median().clip(roi);
+
+}
+
+
+// == Périodes ==
+
+var years = [2023, 2024, 2025];
+
+// Saison sèche
+var Dry = buildSeason(
+  years,
+  11,
+  16,
+  3,
+  15
+);
+
+// Saison humide
+var Wet = buildSeason(
+  years,
+  3,
+  1,
+  11,
+  30
+);
+
+
+// == EXTRACTION DES IMAGES ==
+
+var Dry_RED = Dry.select('RED');
+var Dry_NIR = Dry.select('NIR');
+var Dry_NDVI = Dry.select('NDVI');
+
+var Wet_RED = Wet.select('RED');
+var Wet_NIR = Wet.select('NIR');
+var Wet_NDVI = Wet.select('NDVI');
+
+
+// == VISUALISATION ==
+
+Map.addLayer(Dry_RED,{min:0,max:0.3},'Dry RED');
+
+Map.addLayer(Dry_NIR,{min:0,max:0.5},'Dry NIR');
+
+Map.addLayer(
+  Dry_NDVI,
+  {
+    min:-0.2,
+    max:0.9,
+    palette:['brown','yellow','green']
+  },
+  'Dry NDVI'
+);
+
+Map.addLayer(Wet_RED,{min:0,max:0.3},'Wet RED');
+
+Map.addLayer(Wet_NIR,{min:0,max:0.5},'Wet NIR');
+
+Map.addLayer(
+  Wet_NDVI,
+  {
+    min:-0.2,
+    max:0.9,
+    palette:['brown','yellow','green']
+  },
+  'Wet NDVI'
+);
+
+
+// == EXPORTS ==
+
+Export.image.toDrive({
+  image: Dry_RED,
+  description:'Dry_RED_2023_2025',
+  folder:'QGIS_EXPORT',
+  region:roi,
+  scale:30,
+  maxPixels:1e13
+});
+
+Export.image.toDrive({
+  image: Dry_NIR,
+  description:'Dry_NIR_2023_2025',
+  folder:'QGIS_EXPORT',
+  region:roi,
+  scale:30,
+  maxPixels:1e13
+});
+
+Export.image.toDrive({
+  image: Dry_NDVI,
+  description:'Dry_NDVI_2023_2025',
+  folder:'QGIS_EXPORT',
+  region:roi,
+  scale:30,
+  maxPixels:1e13
+});
+
+Export.image.toDrive({
+  image: Wet_RED,
+  description:'Wet_RED_2023_2025',
+  folder:'QGIS_EXPORT',
+  region:roi,
+  scale:30,
+  maxPixels:1e13
+});
+
+Export.image.toDrive({
+  image: Wet_NIR,
+  description:'Wet_NIR_2023_2025',
+  folder:'QGIS_EXPORT',
+  region:roi,
+  scale:30,
+  maxPixels:1e13
+});
+
+Export.image.toDrive({
+  image: Wet_NDVI,
+  description:'Wet_NDVI_2023_2025',
+  folder:'QGIS_EXPORT',
+  region:roi,
+  scale:30,
+  maxPixels:1e13
+});
+</script>
+
+## Comparaison NIR-Saisons
+
+Cette fois, la classification n'est pas utilisée du tout ! On sépare juste les zones qu'on soupçonne agroforestières sous ombrage. Cette fois, on a une image NIR en période "sèche" et une en période "humide".
+En période de pluies fortes et de maximum végétatif (début mars- fin novembre) les agroforêts sous ombrage, plus jeunes émettent fortement dans le proche infrarouge, plus que les forêts mais moins que les cultures à ciel ouvert. En période de déclin végétatif ou de moindres pluies (début décembre- fin février) leur réflectance moyenne dans le proche infrarouge les distingue du reste de la végétation et particulièrement des cultures à ciel ouvert qui n'émettent plus dans ces longueurs d'onde. En augmentant les contrastes des images, les agroforêts sous ombrages deviennent évidentes. Le NDVI des agroforêts est aussi plus fort que celui des forêts primaires aux alentours. Aussi, les cultures à ciel ouvert ont après observation des valeurs de rouge plus élevées que les agroforêts.
+En choisissant un seuil NIR_humide > 0.35, on obtient les zones avec un NIR très élevé (cultures à ciel ouvert et agroforesteries sous canopée). Pour n'obtenir que les agroforesteries sous canopée, on peut discrimier les champs ouverts en choisissant un seuil RED_humide >  (les images en saison humide étant plus propres).
+Aussi, en appliquant un seuil NIR_sec > , on peut obtenir directement les agroforesteries sous canopée bien que moins visibles (d'où l'utilité du NIR_humide). 
+Ce test reste toutefois assez sommaire et bien moins précis que la cartographie du cacao de la FAO, produite par machine-learning. Pour effacer les potentiels faux-positifs, on peut lisser les résultats avec un filtre médian sur R:
