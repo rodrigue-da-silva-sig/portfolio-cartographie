@@ -504,11 +504,15 @@ writeRaster(r_med,
             overwrite = TRUE)
 ```
 
-# Méthode 1: Méthode SBR (Burn ratio)
+
+
+
+
+# Méthode 1: Méthode SBR SWIR1/NIR
 
 ## Raisonnement
 
-La canopée est souvent moins fermée et plus hétérogène en agroforêts qu'en forêt primaire
+La canopée est souvent moins fermée et plus hétérogène en agroforêts sous ombrage qu'en forêt primaire. On s'attend donc à un proche-infrarouge (Bande 5) élevé et un infrarouge à ondes courtes élevé (Bande 6) et un rapport Bande 6/Bande 5 ou SBR faible. En utilisant les images Sentinel-2, cette fois-ci, on parvient à un résultat prometteur.
 
 <script>
 // =====================
