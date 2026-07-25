@@ -580,12 +580,12 @@ function addSBR(image){
     .multiply(0.0000275)
     .add(-0.2);
 
-  var swir1 = image
+  var rededge = image
     .select('B6')
     .multiply(0.0000275)
     .add(-0.2);
 
-  var sbr = swir1
+  var sbr = rededge
     .divide(nir)
     .rename('SBR');
 
