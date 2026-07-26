@@ -518,9 +518,7 @@ writeRaster(r_med,
 Les bandes du domaine Red Edge de Sentinel-2 sont sensibles aux variations de teneur en chlorophylle, de structure foliaire et de densité du couvert végétal. Le rapport B6/B5 permet ainsi de mieux caractériser les différences physiologiques et structurales entre une forêt dense et une agroforêt, notamment lorsque les deux présentent des valeurs de NDVI élevées et proches. Les agroforêts sous ombrage possèdent toutefois des réflectances dans le Red Edge remarquables, plus élevées que celles de la forêt dense: on s'attend donc à obtenir pour ces espaces, un rapport Red Edge2/Red Edge1 faible. Le rapport B7/B5 serait égelement intéressant...
 
 <script>
-// =====================
-// ROI
-// =====================
+// == ROI ===
 
 var roi = ee.Geometry.Rectangle([
   14.9,
@@ -533,16 +531,12 @@ Map.centerObject(roi, 8);
 Map.addLayer(roi, {}, 'ROI');
 
 
-// =====================
-// COLLECTION LANDSAT
-// =====================
+// == Collection Landsat ==
 
 var Sentinel2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED");
   
 
-// =====================
-// FILTRE
-// =====================
+// == Filtres ==
 
 var images = Sentinel2
   .filterBounds(roi)
@@ -551,9 +545,7 @@ var images = Sentinel2
 
 print('Nombre d\'images :', images.size());
 
-// =====================
-// MASQUE QA_PIXEL
-// =====================
+// == Masque QA_PIXEL ==
 
 function maskLandsat(image){
 
@@ -568,10 +560,8 @@ function maskLandsat(image){
 
 }
 
-// =====================
-// AJOUT DU SBR
-// SBR = RED EDGE2 / RED EDGE1
-// =====================
+// == Ajout du SBR (Simple Band Ratio) ==
+// == Ici SBR = RED EDGE2 / RED EDGE1 ==
 
 function addSBR(image){
 
@@ -596,9 +586,7 @@ function addSBR(image){
 var imagesSBR = images.map(addSBR);
 
 
-// =====================
-// INFORMATIONS
-// =====================
+// == Informations ==
 
 print(
   'Dates :',
@@ -611,9 +599,7 @@ print(
 );
 
 
-// =====================
-// PREMIERE IMAGE
-// =====================
+// == Première image ==
 
 var first = ee.Image(imagesSBR.first());
 
@@ -644,9 +630,7 @@ Map.addLayer(
 );
 
 
-// =====================
-// COMPOSITE MEDIAN
-// =====================
+// == Composite médian ==
 
 var rededge1Median = imagesSBR
   .select('B5')
@@ -686,28 +670,7 @@ Map.addLayer(
 );
 
 
-// =====================
-// UNION DE TOUS LES PIXELS
-// AYANT UN SBR >= 0.9
-// =====================
-
-var maskCollection = imagesSBR.map(function(image){
-
-  return image
-    .select('SBR')
-    .gte(0.9)
-    .rename('SBR_mask');
-
-});
-
-var unionMask = maskCollection
-  .max()
-  .clip(roi);
-
-
-// =====================
-// VISUALISATION
-// =====================
+// == Visualisation ==
 
 Map.addLayer(
   unionMask,
@@ -723,9 +686,7 @@ Map.addLayer(
 );
 
 
-// =====================
-// EXPORT
-// =====================
+// == Export ==
 
 Export.image.toDrive({
 
@@ -740,22 +701,6 @@ Export.image.toDrive({
   scale: 30,
 
   maxPixels: 1e13
-
-});
-
-Export.image.toDrive({
-
-  image: unionMask,
-
-  description:'Union_SBR_08_2021_2026',
-
-  folder:'QGIS_EXPORT',
-
-  region:roi,
-
-  scale:30,
-
-  maxPixels:1e13
 
 });
 
