@@ -484,8 +484,8 @@ Export.image.toDrive({
 
 Cette fois, la classification n'est pas utilisée du tout ! On sépare juste les zones qu'on soupçonne agroforestières sous ombrage. Cette fois, on a une image NIR en période "sèche" et une en période "humide".
 En période de pluies fortes et de maximum végétatif (début mars- fin novembre) les agroforêts sous ombrage, plus jeunes émettent fortement dans le proche infrarouge, plus que les forêts mais moins que les cultures à ciel ouvert. En période de déclin végétatif ou de moindres pluies (début décembre- fin février) leur réflectance moyenne dans le proche infrarouge les distingue du reste de la végétation et particulièrement des cultures à ciel ouvert qui n'émettent plus dans ces longueurs d'onde. En augmentant les contrastes des images, les agroforêts sous ombrages deviennent évidentes. Le NDVI des agroforêts est aussi plus fort que celui des forêts primaires aux alentours. Aussi, les cultures à ciel ouvert ont après observation des valeurs de rouge plus élevées que les agroforêts.
-En choisissant un seuil NIR_humide > 0.35, on obtient les zones avec un NIR très élevé (cultures à ciel ouvert et agroforesteries sous canopée). Pour n'obtenir que les agroforesteries sous canopée, on peut discrimier les champs ouverts en choisissant un seuil RED_humide >  (les images en saison humide étant plus propres).
-Aussi, en appliquant un seuil NIR_sec > , on peut obtenir directement les agroforesteries sous canopée bien que moins visibles (d'où l'utilité du NIR_humide). 
+En choisissant un seuil NIR_humide > 0.35, on obtient les zones avec un NIR très élevé (cultures à ciel ouvert et agroforesteries sous canopée). Pour n'obtenir que les agroforesteries sous canopée, on peut discriminer les champs ouverts en choisissant un seuil RED_humide > 0.04  (les images en saison humide étant plus propres).
+Aussi, on pourrait aussi appliquer un seuil NIR_sec pour obtenir directement les agroforesteries sous canopée bien que moins visibles (d'où l'utilité du NIR_humide). 
 Ce test reste toutefois assez sommaire et bien moins précis que la cartographie du cacao de la FAO, produite par machine-learning. Pour effacer les potentiels faux-positifs, on peut lisser les résultats avec un filtre médian sur R:
 
 ```{r}
@@ -511,11 +511,11 @@ writeRaster(r_med,
 
 
 
-# Méthode 3: Méthode SBR SWIR1/NIR
+# Méthode 3: Méthode SBR FAR EDGE
 
 ## Raisonnement
 
-La canopée est souvent moins fermée et plus hétérogène en agroforêts sous ombrage qu'en forêt primaire. On s'attend donc à un proche-infrarouge (Bande 5) élevé et un infrarouge à ondes courtes élevé (Bande 6) et un rapport Bande 6/Bande 5 ou SBR faible. En utilisant les images Sentinel-2, cette fois-ci, on parvient à un résultat prometteur.
+Les bandes du domaine Red Edge de Sentinel-2 sont sensibles aux variations de teneur en chlorophylle, de structure foliaire et de densité du couvert végétal. Le rapport B6/B5 permet ainsi de mieux caractériser les différences physiologiques et structurales entre une forêt dense et une agroforêt, notamment lorsque les deux présentent des valeurs de NDVI élevées et proches. Les agroforêts sous ombrage possèdent toutefois des réflectances dans le Red Edge remarquables, plus élevées que celles de la forêt dense: on s'attend donc à obtenir pour ces espaces, un rapport Red Edge2/Red Edge1 faible. Le rapport B7/B5 serait égelement intéressant...
 
 <script>
 // =====================
