@@ -518,7 +518,7 @@ writeRaster(r_med,
 Les bandes du domaine Red Edge de Sentinel-2 sont sensibles aux variations de teneur en chlorophylle, de structure foliaire et de densité du couvert végétal. Le rapport B6/B5 permet ainsi de mieux caractériser les différences physiologiques et structurales entre une forêt dense et une agroforêt, notamment lorsque les deux présentent des valeurs de NDVI élevées et proches. Les agroforêts sous ombrage possèdent toutefois des réflectances dans le Red Edge remarquables, plus élevées que celles de la forêt dense: on s'attend donc à obtenir pour ces espaces, un rapport Red Edge2/Red Edge1 faible. Le rapport B7/B5 serait égelement intéressant...
 
 <script>
-// == ROI ===
+// == ROI ==
 
 var roi = ee.Geometry.Rectangle([
   14.9,
@@ -531,10 +531,10 @@ Map.centerObject(roi, 8);
 Map.addLayer(roi, {}, 'ROI');
 
 
-// == Collection Landsat ==
+// == Collection Sentinel-2 ==
 
 var Sentinel2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED");
-  
+
 
 // == Filtres ==
 
@@ -545,57 +545,63 @@ var images = Sentinel2
 
 print('Nombre d\'images :', images.size());
 
-// == Masque QA_PIXEL ==
 
-function maskLandsat(image){
+// == Masque nuages Sentinel-2 avec SCL ==
 
-  var qa = image.select('QA_PIXEL');
+function maskSentinel2(image){
 
-  var mask = qa.bitwiseAnd(1 << 1).eq(0)   // Dilated cloud
-    .and(qa.bitwiseAnd(1 << 2).eq(0))      // Cirrus
-    .and(qa.bitwiseAnd(1 << 3).eq(0))      // Cloud
-    .and(qa.bitwiseAnd(1 << 4).eq(0));     // Cloud shadow
+  var scl = image.select('SCL');
+
+  var mask = scl.neq(3)    // Cloud shadow
+    .and(scl.neq(8))       // Medium probability clouds
+    .and(scl.neq(9))       // High probability clouds
+    .and(scl.neq(10))      // Thin cirrus
+    .and(scl.neq(11));     // Snow / ice
 
   return image.updateMask(mask);
 
 }
 
-// == Ajout du SBR (Simple Band Ratio) ==
-// == Ici SBR = RED EDGE2 / RED EDGE1 ==
+
+var imagesMasked = images.map(maskSentinel2);
+
+
+// == Ajout du SBR (ici SBR = RED EDGE 2 / RED EDGE 1 = B6 / B5) ==
 
 function addSBR(image){
 
   var rededge1 = image
     .select('B5')
-    .multiply(0.0000275)
-    .add(-0.2);
+    .multiply(0.0001);
 
   var rededge2 = image
     .select('B6')
-    .multiply(0.0000275)
-    .add(-0.2);
+    .multiply(0.0001);
+
 
   var sbr = rededge2
     .divide(rededge1)
     .rename('SBR');
 
+
   return image.addBands(sbr);
 
 }
 
-var imagesSBR = images.map(addSBR);
+
+var imagesSBR = imagesMasked.map(addSBR);
 
 
-// == Informations ==
+// == Informations images ==
 
 print(
   'Dates :',
-  imagesSBR.aggregate_array('DATE_ACQUIRED')
+  imagesSBR.aggregate_array('system:time_start')
 );
 
 print(
   'Produits :',
-  imagesSBR.aggregate_array('LANDSAT_PRODUCT_ID')
+  imagesSBR.aggregate_array('PRODUCT_ID')
 );
 
 
@@ -603,15 +609,17 @@ print(
 
 var first = ee.Image(imagesSBR.first());
 
+
 Map.addLayer(
   first.clip(roi),
   {
     bands:['B4','B3','B2'],
-    min:7000,
-    max:18000
+    min:0,
+    max:3000
   },
   'Première image RGB'
 );
+
 
 Map.addLayer(
   first.select('SBR').clip(roi),
@@ -630,14 +638,17 @@ Map.addLayer(
 );
 
 
-// == Composite médian ==
+// == Composites médians ==
+
+
+// RED EDGE 1 médian
 
 var rededge1Median = imagesSBR
   .select('B5')
   .median()
-  .multiply(0.0000275)
-  .add(-0.2)
+  .multiply(0.0001)
   .clip(roi);
+
 
 Map.addLayer(
   rededge1Median,
@@ -645,13 +656,17 @@ Map.addLayer(
     min:0,
     max:0.5
   },
-  'RED_EDGE1 médian'
+  'RED EDGE 1 médian'
 );
+
+
+// SBR médian
 
 var sbrMedian = imagesSBR
   .select('SBR')
   .median()
   .clip(roi);
+
 
 Map.addLayer(
   sbrMedian,
@@ -670,56 +685,95 @@ Map.addLayer(
 );
 
 
-// == Visualisation ==
+// == Export complet (Rouge + Red Edge + SWIR + SBR) ==
 
-Map.addLayer(
-  unionMask,
-  {
-    min:0,
-    max:1,
-    palette:[
-      'black',
-      'red'
-    ]
-  },
-  'Union SBR >= 0.9'
-);
+var compositeExport = imagesSBR
+  .median()
+  .select([
+    'B4',     // Rouge
+    'B5',     // Red Edge 1
+    'B6',     // Red Edge 2
+    'B11',    // SWIR 1
+    'SBR'
+  ])
+  .clip(roi);
 
 
-// == Export ==
+
+Export.image.toDrive({
+
+  image: compositeExport,
+
+  description:
+  'Sentinel2_Red_RE_SWIR_SBR_Median_2021_2026',
+
+  folder:
+  'QGIS_EXPORT',
+
+  region:
+  roi,
+
+  scale:
+  10,
+
+  maxPixels:
+  1e13
+
+});
+
 
 Export.image.toDrive({
 
   image: rededge1Median,
 
-  description: 'RED_EDGE1_Median_2021_2026',
+  description:
+  'RED_EDGE1_Median_2021_2026',
 
-  folder: 'QGIS_EXPORT',
+  folder:
+  'QGIS_EXPORT',
 
-  region: roi,
+  region:
+  roi,
 
-  scale: 30,
+  scale:
+  10,
 
-  maxPixels: 1e13
+  maxPixels:
+  1e13
 
 });
+
 
 Export.image.toDrive({
 
   image: sbrMedian,
 
-  description: 'SBR_Median_2021_2026',
+  description:
+  'SBR_Median_2021_2026',
 
-  folder: 'QGIS_EXPORT',
+  folder:
+  'QGIS_EXPORT',
 
-  region: roi,
+  region:
+  roi,
 
-  scale: 30,
+  scale:
+  10,
 
-  maxPixels: 1e13
+  maxPixels:
+  1e13
 
 });
 </script>
+
+## Seuils
+
+Le script précédent donne un composite composé de composites médians sur la période 2021-2026. Il intègre plusieurs bandes sensibles aux caractéristiques de la végétation :
+
+B4 (rouge) : absorption chlorophyllienne ;
+B5 et B6 (bandes red edge) : structure du couvert végétal et variations de biomasse ;
+B8 (proche infrarouge) : vigueur et densité de la végétation ;
+B11 (SWIR1) : humidité et structure du couvert.
 
 
 
